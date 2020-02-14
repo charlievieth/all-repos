@@ -63,12 +63,21 @@ def _init(dest: str, path: str, remote: str) -> None:
 
 
 def _default_branch(remote: str) -> str:
-    cmd = ('git', 'ls-remote', '--exit-code', '--symref', remote, 'HEAD')
+    subprocess.check_output(
+            ('git', 'ls-remote', '--exit-code', remote, 'HEAD'),
+            encoding='UTF-8',
+    )
+    cmd = ('git', 'symbolic-ref', '--short', 'HEAD')
     out = subprocess.check_output(cmd, encoding='UTF-8')
-    line = out.splitlines()[0]
-    start, end = 'ref: refs/heads/', '\tHEAD'
-    assert line.startswith(start) and line.endswith(end), line
-    return line[len(start):-1 * len(end)]
+    assert out
+    if '/' in out:
+        a = out.split('/')
+        out = a[-1]
+    return out.strip()
+    # line = out.splitlines()[0]
+    # start, end = 'ref: refs/heads/', '\tHEAD'
+    # assert line.startswith(start) and line.endswith(end), line
+    # return line[len(start):-1 * len(end)]
 
 
 def _fetch_reset(path: str, *, all_branches: bool) -> None:
@@ -83,13 +92,15 @@ def _fetch_reset(path: str, *, all_branches: bool) -> None:
                 '+refs/heads/*:refs/remotes/origin/*',
             )
         else:
+            print(f'# fetch: {path}: {branch}')
             _git('remote', 'set-branches', 'origin', branch)
         _git('fetch', 'origin')
         _git('checkout', branch)
         _git('reset', '--hard', f'origin/{branch}')
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
         # TODO: color / tty
-        print(f'Error fetching {path}')
+        print(f'Error fetching {path}: {e}')
+
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
